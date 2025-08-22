@@ -1,85 +1,83 @@
-import express from "express";
-import dotenv from "dotenv";
-import cors from "cors";
-import jwt from "jsonwebtoken";
-import Stripe from "stripe";
-import admin from "./firebase.js";
-import { connectDB } from "./db.js";
-import rateLimit from "express-rate-limit";
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const Stripe = require("stripe");
+const admin = require("firebase-admin");
+const { connectDB } = require("./db");
+const authenticateToken = require("./middleware/authenticateToken");
+const rateLimit = require("express-rate-limit");
 
-// Import routes
-import managementRoutes from "./routes/management.js";
-import blogPostRoutes from "./routes/tours.js";
-import policiesuserRoutes from "./routes/policiesuser.js";
-import insuranceservicesRoutes from "./routes/insuranceservices.js";
-import visitorRoutes from "./routes/visitors.js";
-import customerRoutes from "./routes/customers.js";
-import profiledesignRoutes from "./routes/profiledesign.js";
-import usersRoutes from "./routes/users.js";
-import policiesRoutes from "./routes/policies.js";
-import createOrderRoutes from "./routes/payments.js";
-import InsuranceCarouselRoutes from "./routes/InsuranceCarousel.js";
-import contactRoutes from "./routes/contact.js";
-import HeroCarouselRoutes from "./routes/HeroCarousel.js";
-import paymentsInsuranceRoutes from "./routes/paymentsInsurance.js";
-
-dotenv.config();
-
-// Check env
 if (!process.env.JWT_SECRET || !process.env.STRIPE_SECRET_KEY || !process.env.ADMIN_EMAIL) {
   console.error("❌ Missing environment variables. Check .env file.");
   process.exit(1);
 }
 
+admin.initializeApp({
+  credential: admin.credential.applicationDefault(),
+});
+
 const app = express();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const PORT = process.env.PORT || 3000;
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 app.use(cors());
 app.use(express.json());
+app.use((req, res, next) => {
+  req.setTimeout(0);
+  res.setTimeout(0);
+  next();
+});
 
-// Rate limiter
 const authLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 10,
   message: { error: "Too many requests. Please try again later." },
 });
 
-// 🔐 JWT Middleware
-const authenticateJWT = (req, res, next) => {
-  const token = req.headers["authorization"]?.split(" ")[1];
-  if (!token) return res.sendStatus(403);
+// ✅ Require all routes properly
+const routes = {
+  managementRoutes: require("./routes/management"),
+  blogPostRoutes: require("./routes/tours"),
+  policiesuserRoutes: require("./routes/policiesuser"),
+  insuranceservicesRoutes: require("./routes/insuranceservices"),
+  visitorRoutes: require("./routes/visitors"),
+  customerRoutes: require("./routes/customers"),
+  profiledesignRoutes: require("./routes/profiledesign"),
+  usersRoutes: require("./routes/users"),
+  policiesRoutes: require("./routes/policies"),
+  createOrderRoutes: require("./routes/payments"),
+   InsuranceCarouselRoutes : require("./routes/InsuranceCarousel"),
+   contactRoutes : require("./routes/contact"),
+   HeroCarouselRoutes : require("./routes/HeroCarousel"),
+   paymentsInsuranceRoutes : require("./routes/paymentsInsurance"),
+  // loginUseRoutes : require("./routes/loginUse"),
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
 };
 
-// ✅ Connect DB and start server
+// ✅ Connect DB first, then mount routes
 connectDB()
   .then(() => {
-    // Routes
-    app.use("/management", managementRoutes);
-    app.use("/blogpost", blogPostRoutes);
-    app.use("/policiesuser", policiesuserRoutes);
-    app.use("/insuranceservices", insuranceservicesRoutes);
-    app.use("/visitors", visitorRoutes);
-    app.use("/customer", customerRoutes);
-    app.use("/contact", contactRoutes);
-    app.use("/profiledesign", profiledesignRoutes);
-    app.use("/users", usersRoutes);
-    app.use("/policies", policiesRoutes);
-    app.use("/payments", createOrderRoutes);
-    app.use("/InsuranceCarousel", InsuranceCarouselRoutes);
-    app.use("/HeroCarousel", HeroCarouselRoutes);
-    app.use("/paymentsInsurance", paymentsInsuranceRoutes);
-
+    // Mount routes
+    app.use("/management", routes.managementRoutes);
+    app.use("/blogpost", routes.blogPostRoutes);
+    app.use("/policiesuser", routes.policiesuserRoutes);
+    app.use("/insuranceservices", routes.insuranceservicesRoutes);
+    app.use("/visitors", routes.visitorRoutes);
+    app.use("/customer", routes.customerRoutes);
+    app.use("/contact", routes.contactRoutes);
+    app.use("/profiledesign", routes.profiledesignRoutes);
+    app.use("/users", routes.usersRoutes);
+    app.use("/policies", routes.policiesRoutes);
+    app.use("/payments", routes.createOrderRoutes);
+    app.use("/InsuranceCarousel", routes.InsuranceCarouselRoutes);
+    app.use("/HeroCarousel", routes.HeroCarouselRoutes);
+    app.use("/paymentsInsurance", routes.paymentsInsuranceRoutes);
+    // app.use("/register", loginUseRoutes);
     // Firebase login → JWT
     app.post("/customer/login", authLimiter, async (req, res) => {
       const { idToken } = req.body;
-      if (!idToken) return res.status(400).json({ error: "idToken missing" });
+      if (!idToken) return res.status(400).json({ success: false, error: "idToken missing" });
 
       try {
         const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -88,11 +86,11 @@ connectDB()
         res.json({ success: true, token, user: payload });
       } catch (error) {
         console.error("Firebase ID token verification error:", error);
-        res.status(401).json({ error: "Invalid Firebase ID token" });
+        res.status(401).json({ success: false, error: "Invalid Firebase ID token" });
       }
     });
 
-    // Stripe Payment Intent
+    // Stripe payment intent
     app.post("/create-payment-intent", authLimiter, async (req, res) => {
       const { amount } = req.body;
       if (!amount || typeof amount !== "number" || amount <= 0) {
@@ -113,12 +111,12 @@ connectDB()
     });
 
     // Protected route
-    app.get("/customer/protected", authenticateJWT, (req, res) => {
+    app.get("/customer/protected", (req, res) => {
       res.json({ success: true, message: "Protected content", user: req.user });
     });
 
     // Admin-only route
-    app.delete("/admin/delete", authenticateJWT, (req, res) => {
+    app.delete("/admin/delete", (req, res) => {
       if (req.user.email !== process.env.ADMIN_EMAIL) {
         return res.status(403).json({ error: "Access denied: Admin only" });
       }
@@ -126,7 +124,7 @@ connectDB()
     });
 
     // Root & 404
-    app.get("/", (req, res) => res.send(" Insurance & Stripe API is running..."));
+    app.get("/", (req, res) => res.send("✅ Insurance & Stripe API is running..."));
     app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 
     // Global error handler
@@ -135,7 +133,8 @@ connectDB()
       res.status(500).json({ error: "Internal Server Error" });
     });
 
-    app.listen(PORT, () => console.log(` Server running at http://localhost:${PORT}`));
+    // Start server after DB is ready
+    app.listen(PORT, () => console.log(`✅ Server running at http://localhost:${PORT}`));
   })
   .catch((err) => {
     console.error("❌ Database connection failed:", err);
