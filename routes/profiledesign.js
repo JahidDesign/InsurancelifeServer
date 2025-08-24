@@ -1,110 +1,87 @@
+// routes/tours.js
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { getProfiledesignCollection } = require('../db');
+const { getProfileDesignCollection } = require('../db'); // Make sure this is properly exported
 
 const router = express.Router();
 
-// GET all profiles
+// GET all tour bookings
 router.get('/', async (req, res) => {
   try {
-    const profiles = await getProfiledesignCollection().find().toArray();
-    res.status(200).json(profiles);
+    const bookings = await getProfileDesignCollection().find().toArray();
+    res.json(bookings);
   } catch (error) {
-    console.error('Error fetching profiles:', error);
-    res.status(500).json({ error: 'Failed to fetch profiles' });
+    console.error('Error fetching bookings:', error);
+    res.status(500).json({ error: 'Failed to fetch tour bookings' });
   }
 });
 
-// GET profile by ID
+// GET a specific booking by ID
 router.get('/:id', async (req, res) => {
-  const { id } = req.params;
-
-  if (!ObjectId.isValid(id)) {
-    return res.status(400).json({ error: 'Invalid profile ID' });
-  }
-
   try {
-    const profile = await getProfiledesignCollection().findOne({ _id: new ObjectId(id) });
+    const booking = await getProfileDesignCollection().findOne({
+      _id: new ObjectId(req.params.id),
+    });
 
-    if (!profile) {
-      return res.status(404).json({ error: 'Profile not found' });
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
     }
 
-    res.status(200).json(profile);
+    res.json(booking);
   } catch (error) {
-    console.error('Error retrieving profile:', error);
-    res.status(500).json({ error: 'Failed to retrieve profile' });
+    console.error('Invalid ID format or error:', error);
+    res.status(400).json({ error: 'Invalid booking ID' });
   }
 });
 
-// POST new profile
+// CREATE a new booking
 router.post('/', async (req, res) => {
-  const profile = req.body;
-
-  if (!profile.bio || !profile.coverImage) {
-    return res.status(400).json({ error: 'Missing bio or coverImage' });
-  }
-
-  profile.date = new Date().toISOString();
-  profile.socialLinks = profile.socialLinks || {};
-
   try {
-    const result = await getProfiledesignCollection().insertOne(profile);
-    res.status(201).json({
-      message: 'Profile created successfully',
-      insertedId: result.insertedId,
-    });
+    const result = await getProfileDesignCollection().insertOne(req.body);
+    res
+      .status(201)
+      .json({ message: 'Booking created successfully', insertedId: result.insertedId });
   } catch (error) {
-    console.error('Error creating profile:', error);
-    res.status(500).json({ error: 'Failed to create profile' });
+    console.error('Error creating booking:', error);
+    res.status(400).json({ error: 'Failed to create booking' });
   }
 });
 
-// PUT update profile by ID
+// UPDATE an existing booking
 router.put('/:id', async (req, res) => {
-  const { id } = req.params;
-  const updatedProfile = req.body;
-
-  if (!ObjectId.isValid(id)) {
-    return res.status(400).json({ error: 'Invalid profile ID' });
-  }
-
   try {
-    const result = await getProfiledesignCollection().updateOne(
-      { _id: new ObjectId(id) },
-      { $set: updatedProfile }
+    const result = await getProfileDesignCollection().updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: req.body },
+      { upsert: false }
     );
 
     if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'Profile not found' });
+      return res.status(404).json({ error: 'Booking not found' });
     }
 
-    res.status(200).json({ message: 'Profile updated successfully' });
+    res.json({ message: 'Booking updated successfully', result });
   } catch (error) {
-    console.error('Error updating profile:', error);
-    res.status(500).json({ error: 'Failed to update profile' });
+    console.error('Error updating booking:', error);
+    res.status(400).json({ error: 'Failed to update booking' });
   }
 });
 
-// DELETE profile by ID
+// DELETE a booking
 router.delete('/:id', async (req, res) => {
-  const { id } = req.params;
-
-  if (!ObjectId.isValid(id)) {
-    return res.status(400).json({ error: 'Invalid profile ID' });
-  }
-
   try {
-    const result = await getProfiledesignCollection().deleteOne({ _id: new ObjectId(id) });
+    const result = await getProfileDesignCollection().deleteOne({
+      _id: new ObjectId(req.params.id),
+    });
 
     if (result.deletedCount === 0) {
-      return res.status(404).json({ error: 'Profile not found' });
+      return res.status(404).json({ error: 'Booking not found' });
     }
 
-    res.status(200).json({ message: 'Profile deleted successfully' });
+    res.json({ message: 'Booking deleted successfully' });
   } catch (error) {
-    console.error('Error deleting profile:', error);
-    res.status(500).json({ error: 'Failed to delete profile' });
+    console.error('Error deleting booking:', error);
+    res.status(400).json({ error: 'Failed to delete booking' });
   }
 });
 
