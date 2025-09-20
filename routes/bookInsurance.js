@@ -1,247 +1,11 @@
-// routes/insuranceServices.js
+// routes/insuranceBookings.js
 const express = require("express");
 const { ObjectId } = require("mongodb");
-const {
-  getBookInsuranceCollection,
-  getOurInsurancePoliceCollection,
-} = require("../db");
+const { getBookInsuranceCollection } = require("../db");
 
 const router = express.Router();
 
-/* ===================== INSURANCE SERVICES CRUD ===================== */
-
-// CREATE Service
-router.post("/", async (req, res) => {
-  try {
-    const {
-      serviceName,
-      providerName,
-      coverageAmount,
-      premium,
-      contactEmail,
-      contactNumber,
-      imageUrl,
-      description,
-    } = req.body;
-
-    if (!serviceName || !providerName) {
-      return res.status(400).json({
-        success: false,
-        message: "Service name and provider name are required",
-      });
-    }
-
-    const newService = {
-      serviceName,
-      providerName,
-      coverageAmount: Number(coverageAmount) || 0,
-      premium: Number(premium) || 0,
-      contactEmail: contactEmail || "",
-      contactNumber: contactNumber || "",
-      imageUrl: imageUrl || "",
-      description: description || "",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const collection = await getOurInsurancePoliceCollection();
-    const result = await collection.insertOne(newService);
-
-    res.status(201).json({
-      success: true,
-      message: "Service created",
-      id: result.insertedId,
-    });
-  } catch (err) {
-    console.error("Create service error:", err);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
-});
-
-/* ===================== QUOTE ESTIMATOR ===================== */
-// ⚠️ placed BEFORE `/:id` to avoid conflict
-router.get("/quote", async (req, res) => {
-  try {
-    let { age, gender, coverageAmount, duration, smoker, page = 1, limit = 10 } =
-      req.query;
-
-    age = parseInt(age);
-    coverageAmount = parseFloat(coverageAmount);
-    duration = parseInt(duration);
-    page = parseInt(page);
-    limit = parseInt(limit);
-
-    if (!age || !gender || !coverageAmount || !duration || !smoker) {
-      return res
-        .status(400)
-        .json({ success: false, message: "All fields are required" });
-    }
-
-    // Premium calculation
-    let baseRate = 2; // 2% base
-    if (age > 40) baseRate += 1;
-    if (smoker.toLowerCase() === "yes") baseRate += 1;
-    if (gender.toLowerCase() === "male") baseRate += 0.5;
-
-    const annualPremium = (coverageAmount * baseRate) / 100;
-    const monthlyPremium = annualPremium / 12;
-
-    const collection = await getBookInsuranceCollection();
-    const quoteRecord = {
-      age,
-      gender,
-      coverageAmount,
-      duration,
-      smoker,
-      annualPremium,
-      monthlyPremium,
-      createdAt: new Date(),
-    };
-    await collection.insertOne(quoteRecord);
-
-    const totalQuotes = await collection.countDocuments();
-    const quotes = await collection
-      .find()
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
-      .toArray();
-
-    res.json({
-      success: true,
-      estimatedPremium: {
-        monthly: monthlyPremium.toFixed(2),
-        annual: annualPremium.toFixed(2),
-      },
-      quotes: {
-        page,
-        limit,
-        total: totalQuotes,
-        totalPages: Math.ceil(totalQuotes / limit),
-        data: quotes,
-      },
-      message: "Estimated premium calculated successfully",
-    });
-  } catch (err) {
-    console.error("Quote error:", err);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
-});
-
-/* ===================== GET ALL SERVICES ===================== */
-router.get("/", async (req, res) => {
-  try {
-    const collection = await getOurInsurancePoliceCollection();
-
-    const { page = 1, limit = 10, q = "" } = req.query;
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
-
-    const searchFilter = q
-      ? {
-          $or: [
-            { serviceName: { $regex: q, $options: "i" } },
-            { providerName: { $regex: q, $options: "i" } },
-            { description: { $regex: q, $options: "i" } },
-          ],
-        }
-      : {};
-
-    const total = await collection.countDocuments(searchFilter);
-    const services = await collection
-      .find(searchFilter)
-      .sort({ createdAt: -1 })
-      .skip((pageNum - 1) * limitNum)
-      .limit(limitNum)
-      .toArray();
-
-    res.json({
-      success: true,
-      page: pageNum,
-      limit: limitNum,
-      total,
-      totalPages: Math.ceil(total / limitNum),
-      services,
-    });
-  } catch (err) {
-    console.error("Get all services error:", err);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
-});
-
-/* ===================== GET SINGLE SERVICE ===================== */
-router.get("/:id", async (req, res) => {
-  try {
-    if (!ObjectId.isValid(req.params.id))
-      return res.status(400).json({ success: false, message: "Invalid ID" });
-
-    const collection = await getOurInsurancePoliceCollection();
-    const service = await collection.findOne({
-      _id: new ObjectId(req.params.id),
-    });
-
-    if (!service)
-      return res
-        .status(404)
-        .json({ success: false, message: "Service not found" });
-
-    res.json({ success: true, service });
-  } catch (err) {
-    console.error("Get service error:", err);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
-});
-
-/* ===================== UPDATE SERVICE ===================== */
-router.put("/:id", async (req, res) => {
-  try {
-    if (!ObjectId.isValid(req.params.id))
-      return res.status(400).json({ success: false, message: "Invalid ID" });
-
-    const collection = await getOurInsurancePoliceCollection();
-    const result = await collection.updateOne(
-      { _id: new ObjectId(req.params.id) },
-      { $set: { ...req.body, updatedAt: new Date() } }
-    );
-
-    if (result.matchedCount === 0)
-      return res
-        .status(404)
-        .json({ success: false, message: "Service not found" });
-
-    res.json({ success: true, message: "Service updated" });
-  } catch (err) {
-    console.error("Update service error:", err);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
-});
-
-/* ===================== DELETE SERVICE ===================== */
-router.delete("/:id", async (req, res) => {
-  try {
-    if (!ObjectId.isValid(req.params.id))
-      return res.status(400).json({ success: false, message: "Invalid ID" });
-
-    const collection = await getOurInsurancePoliceCollection();
-    const result = await collection.deleteOne({
-      _id: new ObjectId(req.params.id),
-    });
-
-    if (result.deletedCount === 0)
-      return res
-        .status(404)
-        .json({ success: false, message: "Service not found" });
-
-    res.json({ success: true, message: "Service deleted" });
-  } catch (err) {
-    console.error("Delete service error:", err);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
-});
-
-/* ===================== BOOKING ROUTES ===================== */
-
-// CREATE booking (from InsuranceDetails.jsx "Book Quote" button)
+/* ===================== CREATE BOOKING ===================== */
 router.post("/bookInsurance", async (req, res) => {
   try {
     const {
@@ -271,6 +35,7 @@ router.post("/bookInsurance", async (req, res) => {
       userEmail,
       userPhoto,
       bookedAt: new Date(),
+      updatedAt: new Date(),
     };
 
     const collection = await getBookInsuranceCollection();
@@ -278,16 +43,18 @@ router.post("/bookInsurance", async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: "Quote booked successfully",
+      message: "Booking created successfully",
       id: result.insertedId,
     });
   } catch (err) {
-    console.error("Book insurance error:", err);
+    console.error("Create booking error:", err);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
 
-// GET all bookings (admin/agent use)
+/* ===================== READ BOOKINGS ===================== */
+
+// Get all bookings (admin/agent)
 router.get("/bookInsurance/all", async (req, res) => {
   try {
     const collection = await getBookInsuranceCollection();
@@ -299,7 +66,7 @@ router.get("/bookInsurance/all", async (req, res) => {
   }
 });
 
-// GET bookings by user email
+// Get bookings by user email
 router.get("/bookInsurance/user/:email", async (req, res) => {
   try {
     const collection = await getBookInsuranceCollection();
@@ -307,10 +74,69 @@ router.get("/bookInsurance/user/:email", async (req, res) => {
       .find({ userEmail: req.params.email })
       .sort({ bookedAt: -1 })
       .toArray();
-
     res.json({ success: true, bookings });
   } catch (err) {
     console.error("Get user bookings error:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+
+// Get single booking by ID
+router.get("/bookInsurance/:id", async (req, res) => {
+  try {
+    if (!ObjectId.isValid(req.params.id))
+      return res.status(400).json({ success: false, message: "Invalid booking ID" });
+
+    const collection = await getBookInsuranceCollection();
+    const booking = await collection.findOne({ _id: new ObjectId(req.params.id) });
+
+    if (!booking)
+      return res.status(404).json({ success: false, message: "Booking not found" });
+
+    res.json({ success: true, booking });
+  } catch (err) {
+    console.error("Get booking error:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+
+/* ===================== UPDATE BOOKING ===================== */
+router.put("/bookInsurance/:id", async (req, res) => {
+  try {
+    if (!ObjectId.isValid(req.params.id))
+      return res.status(400).json({ success: false, message: "Invalid booking ID" });
+
+    const collection = await getBookInsuranceCollection();
+    const result = await collection.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: { ...req.body, updatedAt: new Date() } }
+    );
+
+    if (result.matchedCount === 0)
+      return res.status(404).json({ success: false, message: "Booking not found" });
+
+    res.json({ success: true, message: "Booking updated successfully" });
+  } catch (err) {
+    console.error("Update booking error:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+
+/* ===================== DELETE BOOKING ===================== */
+router.delete("/bookInsurance/:id", async (req, res) => {
+  try {
+    if (!ObjectId.isValid(req.params.id))
+      return res.status(400).json({ success: false, message: "Invalid booking ID" });
+
+    const collection = await getBookInsuranceCollection();
+    const result = await collection.deleteOne({ _id: new ObjectId(req.params.id) });
+
+    if (result.deletedCount === 0)
+      return res.status(404).json({ success: false, message: "Booking not found" });
+
+    res.json({ success: true, message: "Booking deleted successfully" });
+  } catch (err) {
+    console.error("Delete booking error:", err);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 });

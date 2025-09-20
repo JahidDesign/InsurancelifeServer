@@ -1,7 +1,7 @@
 // routes/tours.js
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { getInsuranceCarouselCollection } = require('../db');
+const {   getInsuranceCarouselCollection } = require('../db');
 
 const router = express.Router();
 

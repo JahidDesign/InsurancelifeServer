@@ -27,6 +27,7 @@ let registerCollection;
 let createOrderCollection;
 let InsuranceCarouselCollection;
 let ourInsurancePoliceCollection;
+let insuranceservicesBookingCollection;
 let bookInsuranceCollection;
 let HeroCarouselCollection;
 let paymentsInsuranceCollection;
@@ -41,6 +42,7 @@ async function connectDB() {
     airTicketCollection = db.collection("policiesuser");
     insuranceServicesCollection = db.collection("insuranceservices");
     ourInsurancePoliceCollection = db.collection("ourInsurancePolice");
+    insuranceservicesBookingCollection = db.collection("insuranceservicesBooking");
     bookInsuranceCollection = db.collection("bookInsurance");
     visitorsCollection = db.collection("visitors");
     customerCollection = db.collection("customer"); 
@@ -122,6 +124,10 @@ function getCreateOrderCollection() {
   if (!createOrderCollection) throw new Error("Policies collection not initialized.");
   return createOrderCollection;
 }
+function getInsuranceservicesBookingCollection() {
+  if (!insuranceservicesBookingCollection) throw new Error("Policies collection not initialized.");
+  return insuranceservicesBookingCollection;
+}
 function getInsuranceCarouselCollection() {
   if (!InsuranceCarouselCollection) throw new Error("Policies collection not initialized.");
   return InsuranceCarouselCollection;
@@ -138,6 +144,10 @@ function getContactCollection() {
   if (!contactCollection) throw new Error("Policies collection not initialized.");
   return contactCollection;
 }
+function getContactCollection() {
+  if (!insuranceservicesBooking) throw new Error("Policies collection not initialized.");
+  return insuranceservicesBooking;
+}
 
 module.exports = {
   connectDB,
@@ -151,6 +161,7 @@ module.exports = {
   getCustomerCollection,
   getContactCollection,
   getProfileDesignCollection,
+  getInsuranceservicesBookingCollection,
   getUsersCollection,
   getPoliciesCollection,
   getRegisterCollection,
