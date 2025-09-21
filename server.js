@@ -39,6 +39,7 @@ const authLimiter = rateLimit({
 const routes = {
   managementRoutes: require("./routes/management"),
   blogPostRoutes: require("./routes/tours"),
+  blogpostHomeRoutes: require("./routes/blogpostHome"),
   policiesuserRoutes: require("./routes/policiesuser"),
   insuranceservicesRoutes: require("./routes/insuranceservices"),
   OurinsuranceservicesRoutes: require("./routes/ourInsurancePolice"),
@@ -64,6 +65,7 @@ connectDB()
     // Mount routes
     app.use("/management", routes.managementRoutes);
     app.use("/blogpost", routes.blogPostRoutes);
+    app.use("/blogpostHome", routes.blogpostHomeRoutes);
     app.use("/policiesuser", routes.policiesuserRoutes);
     app.use("/insuranceservices", routes.insuranceservicesRoutes);
     app.use("/ourInsurancePolice", routes.OurinsuranceservicesRoutes);

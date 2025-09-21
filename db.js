@@ -15,6 +15,7 @@ const client = new MongoClient(uri, {
 let db;
 let managementCollection;
 let blogPostCollection;
+let blogpostHomeCollection;
 let airTicketCollection;
 let insuranceServicesCollection;
 let visitorsCollection;
@@ -39,6 +40,7 @@ async function connectDB() {
 
     managementCollection = db.collection("management");
     blogPostCollection = db.collection("blogpost");
+    blogpostHomeCollection = db.collection("blogpostHome");
     airTicketCollection = db.collection("policiesuser");
     insuranceServicesCollection = db.collection("insuranceservices");
     ourInsurancePoliceCollection = db.collection("ourInsurancePolice");
@@ -72,6 +74,10 @@ function getManagementCollection() {
 function getBlogPostCollection() {
   if (!blogPostCollection) throw new Error("BlogPost collection not initialized.");
   return blogPostCollection;
+}
+function getBlogpostHomeCollection() {
+  if (!blogpostHomeCollection) throw new Error("BlogPost collection not initialized.");
+  return blogpostHomeCollection;
 }
 
 function getAirTicketCollection() {
@@ -153,6 +159,7 @@ module.exports = {
   connectDB,
   getManagementCollection,
   getBlogPostCollection,
+  getBlogpostHomeCollection,
   getAirTicketCollection,
   getInsuranceServicesCollection,
   getOurInsurancePoliceCollection,
