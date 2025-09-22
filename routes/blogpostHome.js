@@ -1,3 +1,4 @@
+// routes/blogpostHome.js
 const express = require("express");
 const { ObjectId } = require("mongodb");
 const { getBlogpostHomeCollection } = require("../db");
@@ -20,8 +21,7 @@ router.get("/", async (req, res) => {
 
 /**
  * GET /blogpostHome/search
- * Search blogs by tags and/or keyword in title/details
- * Example: /blogpostHome/search?tags=Insurance,Finance&keyword=policy
+ * Search blogs by tags and/or keyword
  */
 router.get("/search", async (req, res) => {
   const { tags, keyword } = req.query;
@@ -29,14 +29,14 @@ router.get("/search", async (req, res) => {
   let query = {};
 
   if (tags) {
-    const tagsArray = tags.split(",").map(t => t.trim());
+    const tagsArray = tags.split(",").map((t) => t.trim());
     query.tags = { $in: tagsArray };
   }
 
   if (keyword) {
     query.$or = [
       { title: { $regex: keyword, $options: "i" } },
-      { details: { $regex: keyword, $options: "i" } }
+      { details: { $regex: keyword, $options: "i" } },
     ];
   }
 
@@ -50,29 +50,14 @@ router.get("/search", async (req, res) => {
 });
 
 /**
- * GET /blogpostHome/tag/:tag
- * Fetch blogs by tag
- */
-router.get("/tag/:tag", async (req, res) => {
-  const { tag } = req.params;
-  try {
-    const blogs = await getBlogpostHomeCollection()
-      .find({ tags: { $in: [tag] } })
-      .toArray();
-    res.status(200).json(blogs);
-  } catch (err) {
-    console.error("Failed to fetch blogs by tag:", err);
-    res.status(500).json({ message: "Failed to fetch blogs by tag" });
-  }
-});
-
-/**
  * GET /blogpostHome/:id
  * Fetch single blog by ID
  */
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
-  if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid blog ID" });
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid blog ID" });
+  }
 
   try {
     const blog = await getBlogpostHomeCollection().findOne({ _id: new ObjectId(id) });
@@ -102,10 +87,11 @@ router.post("/", async (req, res) => {
       image: image || "",
       author,
       authorImage: authorImage || "",
-      tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
+      tags: Array.isArray(tags) ? tags : tags ? [tags] : [],
       views: 0,
       createdAt: new Date(),
     };
+
     const result = await getBlogpostHomeCollection().insertOne(newBlog);
     res.status(201).json({ message: "Blog created", blogId: result.insertedId });
   } catch (err) {
@@ -122,7 +108,9 @@ router.put("/:id", async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
 
-  if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid blog ID" });
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid blog ID" });
+  }
 
   if (updateData.tags) {
     updateData.tags = Array.isArray(updateData.tags) ? updateData.tags : [updateData.tags];
@@ -134,6 +122,7 @@ router.put("/:id", async (req, res) => {
       { $set: updateData },
       { returnDocument: "after" }
     );
+
     if (!result.value) return res.status(404).json({ message: "Blog not found" });
     res.status(200).json({ message: "Blog updated", blog: result.value });
   } catch (err) {
@@ -148,7 +137,9 @@ router.put("/:id", async (req, res) => {
  */
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
-  if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid blog ID" });
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid blog ID" });
+  }
 
   try {
     const result = await getBlogpostHomeCollection().deleteOne({ _id: new ObjectId(id) });
@@ -166,7 +157,9 @@ router.delete("/:id", async (req, res) => {
  */
 router.post("/:id/increment-view", async (req, res) => {
   const { id } = req.params;
-  if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid blog ID" });
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid blog ID" });
+  }
 
   try {
     const result = await getBlogpostHomeCollection().findOneAndUpdate(
@@ -174,6 +167,7 @@ router.post("/:id/increment-view", async (req, res) => {
       { $inc: { views: 1 } },
       { returnDocument: "after" }
     );
+
     if (!result.value) return res.status(404).json({ message: "Blog not found" });
     res.status(200).json({ views: result.value.views });
   } catch (err) {
