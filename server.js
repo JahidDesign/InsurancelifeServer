@@ -41,6 +41,7 @@ const routes = {
   blogPostRoutes: require("./routes/tours"),
   blogpostHomeRoutes: require("./routes/blogpostHome"),
   policiesuserRoutes: require("./routes/policiesuser"),
+  subscribersRoutes: require("./routes/subscribers"),
   insuranceservicesRoutes: require("./routes/insuranceservices"),
   OurinsuranceservicesRoutes: require("./routes/ourInsurancePolice"),
   bookInsuranceRoutes: require("./routes/bookInsurance"),
@@ -67,6 +68,7 @@ connectDB()
     app.use("/blogpost", routes.blogPostRoutes);
     app.use("/blogpostHome", routes.blogpostHomeRoutes);
     app.use("/policiesuser", routes.policiesuserRoutes);
+    app.use("/subscribers", routes.subscribersRoutes);
     app.use("/insuranceservices", routes.insuranceservicesRoutes);
     app.use("/ourInsurancePolice", routes.OurinsuranceservicesRoutes);
     app.use("/insuranceservicesBooking", routes.insuranceservicesBookingRoutes);

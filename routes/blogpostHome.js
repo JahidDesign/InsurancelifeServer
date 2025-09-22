@@ -1,124 +1,184 @@
-// routes/tours.js
 const express = require("express");
 const { ObjectId } = require("mongodb");
-const { getBlogpostHomeCollection } = require("../db"); // replace with your collection
+const { getBlogpostHomeCollection } = require("../db");
 
 const router = express.Router();
 
 /**
- * GET /tours
- * Get all tours
+ * GET /blogpostHome
+ * Fetch all blogs
  */
 router.get("/", async (req, res) => {
   try {
-    const tours = await getBlogpostHomeCollection().find().toArray();
-    res.status(200).json(tours);
+    const blogs = await getBlogpostHomeCollection().find().toArray();
+    res.status(200).json(blogs);
   } catch (err) {
-    console.error("Failed to fetch tours:", err);
-    res.status(500).json({ error: "Failed to fetch tour bookings" });
+    console.error("Failed to fetch blogs:", err);
+    res.status(500).json({ message: "Failed to fetch blogs" });
   }
 });
 
 /**
- * GET /tours/:id
- * Get a single tour by ID and increment visitor count
+ * GET /blogpostHome/search
+ * Search blogs by tags and/or keyword in title/details
+ * Example: /blogpostHome/search?tags=Insurance,Finance&keyword=policy
+ */
+router.get("/search", async (req, res) => {
+  const { tags, keyword } = req.query;
+
+  let query = {};
+
+  if (tags) {
+    const tagsArray = tags.split(",").map(t => t.trim());
+    query.tags = { $in: tagsArray };
+  }
+
+  if (keyword) {
+    query.$or = [
+      { title: { $regex: keyword, $options: "i" } },
+      { details: { $regex: keyword, $options: "i" } }
+    ];
+  }
+
+  try {
+    const blogs = await getBlogpostHomeCollection().find(query).toArray();
+    res.status(200).json(blogs);
+  } catch (err) {
+    console.error("Failed to search blogs:", err);
+    res.status(500).json({ message: "Failed to search blogs" });
+  }
+});
+
+/**
+ * GET /blogpostHome/tag/:tag
+ * Fetch blogs by tag
+ */
+router.get("/tag/:tag", async (req, res) => {
+  const { tag } = req.params;
+  try {
+    const blogs = await getBlogpostHomeCollection()
+      .find({ tags: { $in: [tag] } })
+      .toArray();
+    res.status(200).json(blogs);
+  } catch (err) {
+    console.error("Failed to fetch blogs by tag:", err);
+    res.status(500).json({ message: "Failed to fetch blogs by tag" });
+  }
+});
+
+/**
+ * GET /blogpostHome/:id
+ * Fetch single blog by ID
  */
 router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid blog ID" });
+
   try {
-    const tourId = req.params.id;
-    const collection = getBlogpostHomeCollection();
-
-    // Increment visitor count
-    const result = await collection.findOneAndUpdate(
-      { _id: new ObjectId(tourId) },
-      { $inc: { views: 1 } }, // increment visitor count
-      { returnDocument: "after" }
-    );
-
-    if (!result.value) return res.status(404).json({ error: "Tour not found" });
-    res.status(200).json(result.value);
+    const blog = await getBlogpostHomeCollection().findOne({ _id: new ObjectId(id) });
+    if (!blog) return res.status(404).json({ message: "Blog not found" });
+    res.status(200).json(blog);
   } catch (err) {
-    console.error("Failed to fetch tour:", err);
-    res.status(400).json({ error: "Invalid tour ID" });
+    console.error("Failed to fetch blog:", err);
+    res.status(500).json({ message: "Failed to fetch blog" });
   }
 });
 
 /**
- * POST /tours
- * Create a new tour
+ * POST /blogpostHome
+ * Create new blog
  */
 router.post("/", async (req, res) => {
+  const { title, details, image, author, authorImage, tags } = req.body;
+
+  if (!title || !details || !author) {
+    return res.status(400).json({ message: "Title, details, and author are required" });
+  }
+
   try {
-    const tourData = {
-      ...req.body,
-      views: 0, // initialize visitor count
+    const newBlog = {
+      title,
+      details,
+      image: image || "",
+      author,
+      authorImage: authorImage || "",
+      tags: Array.isArray(tags) ? tags : (tags ? [tags] : []),
+      views: 0,
+      createdAt: new Date(),
     };
-    const result = await getBlogpostHomeCollection().insertOne(tourData);
-    res.status(201).json({ message: "Tour created", insertedId: result.insertedId });
+    const result = await getBlogpostHomeCollection().insertOne(newBlog);
+    res.status(201).json({ message: "Blog created", blogId: result.insertedId });
   } catch (err) {
-    console.error("Failed to create tour:", err);
-    res.status(400).json({ error: "Failed to create tour" });
+    console.error("Failed to create blog:", err);
+    res.status(500).json({ message: "Failed to create blog" });
   }
 });
 
 /**
- * PUT /tours/:id
- * Update a tour
+ * PUT /blogpostHome/:id
+ * Update a blog
  */
 router.put("/:id", async (req, res) => {
+  const { id } = req.params;
+  const updateData = req.body;
+
+  if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid blog ID" });
+
+  if (updateData.tags) {
+    updateData.tags = Array.isArray(updateData.tags) ? updateData.tags : [updateData.tags];
+  }
+
   try {
-    const tourId = req.params.id;
-    const updateData = req.body;
-
-    const result = await getBlogpostHomeCollection().updateOne(
-      { _id: new ObjectId(tourId) },
+    const result = await getBlogpostHomeCollection().findOneAndUpdate(
+      { _id: new ObjectId(id) },
       { $set: updateData },
-      { upsert: false }
+      { returnDocument: "after" }
     );
-
-    if (result.matchedCount === 0) return res.status(404).json({ error: "Tour not found" });
-    res.status(200).json({ message: "Tour updated successfully", result });
+    if (!result.value) return res.status(404).json({ message: "Blog not found" });
+    res.status(200).json({ message: "Blog updated", blog: result.value });
   } catch (err) {
-    console.error("Failed to update tour:", err);
-    res.status(400).json({ error: "Failed to update tour" });
+    console.error("Failed to update blog:", err);
+    res.status(500).json({ message: "Failed to update blog" });
   }
 });
 
 /**
- * DELETE /tours/:id
- * Delete a tour
+ * DELETE /blogpostHome/:id
+ * Delete a blog
  */
 router.delete("/:id", async (req, res) => {
-  try {
-    const tourId = req.params.id;
-    const result = await getBlogpostHomeCollection().deleteOne({ _id: new ObjectId(tourId) });
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid blog ID" });
 
-    if (result.deletedCount === 0) return res.status(404).json({ error: "Tour not found" });
-    res.status(200).json({ message: "Tour deleted successfully" });
+  try {
+    const result = await getBlogpostHomeCollection().deleteOne({ _id: new ObjectId(id) });
+    if (result.deletedCount === 0) return res.status(404).json({ message: "Blog not found" });
+    res.status(200).json({ message: "Blog deleted" });
   } catch (err) {
-    console.error("Failed to delete tour:", err);
-    res.status(400).json({ error: "Failed to delete tour" });
+    console.error("Failed to delete blog:", err);
+    res.status(500).json({ message: "Failed to delete blog" });
   }
 });
 
 /**
- * PATCH /tours/:id/views
- * Increment only the visitor count
+ * POST /blogpostHome/:id/increment-view
+ * Increment blog views
  */
-router.patch("/:id/views", async (req, res) => {
+router.post("/:id/increment-view", async (req, res) => {
+  const { id } = req.params;
+  if (!ObjectId.isValid(id)) return res.status(400).json({ message: "Invalid blog ID" });
+
   try {
-    const tourId = req.params.id;
     const result = await getBlogpostHomeCollection().findOneAndUpdate(
-      { _id: new ObjectId(tourId) },
+      { _id: new ObjectId(id) },
       { $inc: { views: 1 } },
       { returnDocument: "after" }
     );
-
-    if (!result.value) return res.status(404).json({ error: "Tour not found" });
-    res.status(200).json({ message: "Visitor count incremented", views: result.value.views });
+    if (!result.value) return res.status(404).json({ message: "Blog not found" });
+    res.status(200).json({ views: result.value.views });
   } catch (err) {
     console.error("Failed to increment views:", err);
-    res.status(400).json({ error: "Invalid tour ID" });
+    res.status(500).json({ message: "Failed to increment views" });
   }
 });
 
