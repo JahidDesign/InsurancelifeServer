@@ -28,6 +28,7 @@ let registerCollection;
 let subscribersCollection;
 let createOrderCollection;
 let InsuranceCarouselCollection;
+let claimsCollection;
 let ourInsurancePoliceCollection;
 let insuranceservicesBookingCollection;
 let bookInsuranceCollection;
@@ -53,6 +54,7 @@ async function connectDB() {
     profileDesignCollection = db.collection("profiledesign");
     usersCollection = db.collection("users");
     policiesCollection = db.collection("policies");
+    claimsCollection = db.collection("claims");
     subscribersCollection = db.collection("subscribers");
     registerCollection = db.collection("register");
     createOrderCollection = db.collection("payments");
@@ -68,6 +70,10 @@ async function connectDB() {
 }
 
 // Export getter functions with proper checks and fixed naming
+function getClaimsCollection() {
+  if (!claimsCollection) throw new Error("Management collection not initialized.");
+  return claimsCollection;
+}
 function getSubscribersCollection() {
   if (!subscribersCollection) throw new Error("Management collection not initialized.");
   return subscribersCollection;
@@ -163,6 +169,7 @@ function getContactCollection() {
 
 module.exports = {
   connectDB,
+  getClaimsCollection,
   getManagementCollection,
   getBlogPostCollection,
   getBlogpostHomeCollection,
